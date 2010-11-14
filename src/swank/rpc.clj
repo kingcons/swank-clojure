@@ -64,6 +64,7 @@
                 (. Character isDigit c) (Integer/parseInt str)
                 (= "nil" str) nil
                 (= "t" str) true
+                (= \: (char c)) (keyword (subs str 1))
                 :else (symbol str))))))))
 
 (defn- read-packet
