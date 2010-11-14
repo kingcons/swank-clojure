@@ -4,7 +4,8 @@
   swank.rpc
   (:use (swank util)
         (swank.util io))
-  (:import (java.io Writer Reader PushbackReader StringReader)))
+  (:import (java.io Writer Reader PushbackReader StringReader)
+           (clojure.lang Symbol)))
 
 ;; ERROR HANDLING
 
@@ -92,6 +93,13 @@
 
 (defmethod print-object :default [o, #^Writer w]
   (print-method o w))
+
+(defmethod print-object Symbol [o, #^Writer w]
+  (let [symbol-ns (namespace o)
+        symbol-name (name o)]
+    (.write w (if symbol-ns
+                (format "%s:%s" symbol-ns symbol-name)
+                symbol-name))))
 
 (defmethod print-object Boolean [o, #^Writer w]
   (.write w (if o "t" "nil")))

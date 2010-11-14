@@ -3,15 +3,15 @@
   (:require [swank.rpc :as rpc])
   (:use clojure.test))
 
-(defn- make-swank-reader
+(defn- swank-encode
   ([form]
      (let [buf (StringWriter.)]
        (rpc/encode-message buf form)
-       (StringReader. (.toString buf)))))
+       (.toString buf))))
 
 (defn- round-trip
   ([form]
-     (is (= form (rpc/decode-message (make-swank-reader form))))))
+     (is (= form (rpc/decode-message (StringReader. (swank-encode form)))))))
 
 (deftest encode-decode
   (round-trip "foo")
