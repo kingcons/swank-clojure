@@ -66,7 +66,10 @@
                 (= "nil" str) nil
                 (= "t" str) true
                 (= \: (char c)) (keyword (subs str 1))
-                :else (symbol str))))))))
+                :else (if-let [[_ symbol-ns symbol-name]
+                               (re-matches #"^([^:]+):([^:]+)$" str)]
+                        (symbol symbol-ns symbol-name)
+                        (symbol str)))))))))
 
 (defn- read-packet
   ([#^Reader reader]

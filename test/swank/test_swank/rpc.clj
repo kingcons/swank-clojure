@@ -25,10 +25,11 @@
   (round-trip true)
   (round-trip '(foo))
   (round-trip :foo)
-  (round-trip '(:emacs-rex (swank:connection-info) "COMMON-LISP-USER" true 1)))
+  (round-trip '(:emacs-rex (swank/connection-info) "COMMON-LISP-USER" true 1)))
 
 (deftest namespaces
-  (is (= "swank:foo" (subs (swank-encode 'swank/foo) 6))))
+  (is (= "swank:foo" (subs (swank-encode 'swank/foo) 6)))
+  (is (= 'swank/foo (swank-decode "000009swank:foo"))))
 
 (deftest read-cursor-marker
   (is (= `("+" ~(symbol "swank::%cursor-marker%"))
