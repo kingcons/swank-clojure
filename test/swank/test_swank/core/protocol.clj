@@ -10,7 +10,8 @@
                     (= (read-swank-message reader) form))
        "0000017"                        7
        "000013(:keyword \"string\")"    '(:keyword "string")
-       "000018(nested (list [vector]))" '(nested (list [vector]))))
+       "000018(nested (list [vector]))" '(nested (list [vector]))
+       "000002[]"                       '[]))
 
 (deftest writing-messages
   (are [form msg] (with-open [writer (StringWriter.)]
