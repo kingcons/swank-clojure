@@ -25,6 +25,20 @@
 
 ;; INPUT
 
+(declare read-form read-sequence-form)
+
+(defn- read-sequence-form
+  ([#^Reader rdr closing-char]
+     (let [closing-char (int closing-char)]
+       (loop [forms []]
+         (let [next-char (.read rdr)]
+           (condp = next-char
+               -1 (throw (Exception. "Incomplete sequence."))
+               closing-char forms
+               (do
+                 (when (not= next-char 32) (.unread rdr next-char))
+                 (recur (conj forms (read-form rdr))))))))))
+
 (defn- read-form
    "Read a form that conforms to the swank rpc protocol"
   ([#^Reader rdr]
@@ -41,25 +55,18 @@
                             (recur))
                     (do (.append sb (char c))
                         (recur)))))))
-          \( (loop [result []]
-               (let [form (read-form rdr)]
-                     (let [c (.read rdr)]
-                       (if (= c -1)
-                         (throw (java.io.EOFException. "Incomplete reading of list."))
-                         (condp = (char c)
-                           \) (sequence (conj result form))
-                           \space (recur (conj result form)))))))
+          \( (list* (read-sequence-form rdr \)))
+          \[ (vec (read-sequence-form rdr \]))
           \' (list 'quote (read-form rdr))
           (let [sb (StringBuilder.)]
             (loop [c c]
               (if (not= c -1)
-                (condp = (char c)
-                  \\ (do (.append sb (char (.read rdr)))
-                         (recur (.read rdr)))
-                  \space (.unread rdr c)
-                  \) (.unread rdr c)
-                  (do (.append sb (char c))
-                      (recur (.read rdr))))))
+                (case (char c)
+                      \\ (do (.append sb (char (.read rdr)))
+                             (recur (.read rdr)))
+                      (\space \) \]) (.unread rdr c)
+                      (do (.append sb (char c))
+                          (recur (.read rdr))))))
             (let [str (str sb)]
               (cond
                 (. Character isDigit c) (Integer/parseInt str)
