@@ -4,19 +4,42 @@
   (:use clojure.test
         swank.core.protocol))
 
-;; currently here until test-is 
-(deftest reading-messages
-  (are [msg form] (with-open [reader (StringReader. msg)]
-                    (= (read-swank-message reader) form))
-       "0000017"                        7
-       "000013(:keyword \"string\")"    '(:keyword "string")
-       "000018(nested (list [vector]))" '(nested (list [vector]))))
+(defn- read-swank-message-str
+  ([message]
+     (with-open [reader (StringReader. message)]
+       (read-swank-message reader))))
 
-(deftest writing-messages
-  (are [form msg] (with-open [writer (StringWriter.)]
-                    (write-swank-message writer form)
-                    (= (.toString writer) msg))
-       
-       9                         "0000019"
-       '(:keyword "string")      "000013(:keyword \"string\")"
-       '(nested (list [vector])) "000018(nested (list [vector]))"))
+(defn- write-swank-message-str
+  ([form]
+     (with-open [writer (StringWriter.)]
+       (write-swank-message writer form)
+       (.toString writer))))
+
+(deftest round-trip-messages
+  (are [form form-str]
+       (let [prefixed-form-str (format "%06x%s"
+                                       (count form-str)
+                                       form-str)]
+         (and (= (read-swank-message-str prefixed-form-str) form)
+              (= (write-swank-message-str form) prefixed-form-str)))
+
+       42 "42"
+       "foo" "\"foo\""
+       nil "nil"
+       true "t"
+       'foo "foo"
+       'foo/bar "foo:bar"
+       :foo ":foo"
+       '(a b c) "(a b c)"
+       '[a b c] "[a b c]"
+       '(:keyword "string") "(:keyword \"string\")"
+       '(nested (list [vector])) "(nested (list [vector]))"
+       [] "[]"
+
+       '(:emacs-rex (swank/connection-info) "COMMON-LISP-USER" true 1)
+       "(:emacs-rex (swank:connection-info) \"COMMON-LISP-USER\" t 1)"
+       ))
+
+(deftest read-cursor-marker
+  (is (= (read-swank-message-str "00001c(\"+\" swank::%cursor-marker%)")
+         `("+" ~(symbol "swank::%cursor-marker%")))))

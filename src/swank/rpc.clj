@@ -4,7 +4,8 @@
   swank.rpc
   (:use (swank util)
         (swank.util io))
-  (:import (java.io Writer Reader PushbackReader StringReader)))
+  (:import (java.io Writer Reader PushbackReader StringReader)
+           (clojure.lang Symbol)))
 
 ;; ERROR HANDLING
 
@@ -24,6 +25,20 @@
 
 ;; INPUT
 
+(declare read-form read-sequence-form)
+
+(defn- read-sequence-form
+  ([#^Reader rdr closing-char]
+     (let [closing-char (int closing-char)]
+       (loop [forms []]
+         (let [next-char (.read rdr)]
+           (condp = next-char
+               -1 (throw (Exception. "Incomplete sequence."))
+               closing-char forms
+               (do
+                 (when (not= next-char 32) (.unread rdr next-char))
+                 (recur (conj forms (read-form rdr))))))))))
+
 (defn- read-form
    "Read a form that conforms to the swank rpc protocol"
   ([#^Reader rdr]
@@ -40,31 +55,28 @@
                             (recur))
                     (do (.append sb (char c))
                         (recur)))))))
-          \( (loop [result []]
-               (let [form (read-form rdr)]
-                     (let [c (.read rdr)]
-                       (if (= c -1)
-                         (throw (java.io.EOFException. "Incomplete reading of list."))
-                         (condp = (char c)
-                           \) (sequence (conj result form))
-                           \space (recur (conj result form)))))))
+          \( (list* (read-sequence-form rdr \)))
+          \[ (vec (read-sequence-form rdr \]))
           \' (list 'quote (read-form rdr))
           (let [sb (StringBuilder.)]
             (loop [c c]
               (if (not= c -1)
-                (condp = (char c)
-                  \\ (do (.append sb (char (.read rdr)))
-                         (recur (.read rdr)))
-                  \space (.unread rdr c)
-                  \) (.unread rdr c)
-                  (do (.append sb (char c))
-                      (recur (.read rdr))))))
+                (case (char c)
+                      \\ (do (.append sb (char (.read rdr)))
+                             (recur (.read rdr)))
+                      (\space \) \]) (.unread rdr c)
+                      (do (.append sb (char c))
+                          (recur (.read rdr))))))
             (let [str (str sb)]
               (cond
                 (. Character isDigit c) (Integer/parseInt str)
                 (= "nil" str) nil
                 (= "t" str) true
-                :else (symbol str))))))))
+                (= \: (char c)) (keyword (subs str 1))
+                :else (if-let [[_ symbol-ns symbol-name]
+                               (re-matches #"^([^:]+):([^:]+)$" str)]
+                        (symbol symbol-ns symbol-name)
+                        (symbol str)))))))))
 
 (defn- read-packet
   ([#^Reader reader]
@@ -91,6 +103,13 @@
 
 (defmethod print-object :default [o, #^Writer w]
   (print-method o w))
+
+(defmethod print-object Symbol [o, #^Writer w]
+  (let [symbol-ns (namespace o)
+        symbol-name (name o)]
+    (.write w (if symbol-ns
+                (format "%s:%s" symbol-ns symbol-name)
+                symbol-name))))
 
 (defmethod print-object Boolean [o, #^Writer w]
   (.write w (if o "t" "nil")))
