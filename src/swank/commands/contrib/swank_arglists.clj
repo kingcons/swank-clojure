@@ -1,5 +1,8 @@
 (ns swank.commands.contrib.swank-arglists
-  (:use (swank util core commands)))
+  ; TMP: May be necessary for autodoc...
+  ;(:refer-clojure :exclude [load-file])
+  (:use (swank util core commands)
+        (swank.commands basic)))
 
 ((slime-fn 'swank-require) :swank-c-p-c)
 
@@ -121,3 +124,24 @@
            (str variable-name " => " (var-get var)))))
      (catch Exception e nil))
     "")))
+
+(defn autodoc*
+  [raw-specs & options]
+  (let [{:keys [print-right-margin
+                print-lines]} (if (first options)
+                                (apply hash-map options)
+                                {})]
+    (if (and raw-specs
+             (seq? raw-specs)
+             (not (= (first raw-specs) "")))
+      ((slime-fn 'operator-arglist)
+       (first raw-specs)
+       *current-package*)
+      `:not-available)))
+
+(defslimefn autodoc
+  "Return a string representing the arglist for the deepest subform in
+RAW-FORM that does have an arglist.
+TODO: The highlighted parameter is wrapped in ===> X <===."
+  [raw-specs & options]
+  (apply autodoc* raw-specs options))
